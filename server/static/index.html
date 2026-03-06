@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hallenvisualisierung – Admin</title>
+  <style>
+    /* ---- Reset & Basis ---- */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    /* ---- Layout ---- */
+    header {
+      background: #1a1d2e;
+      border-bottom: 2px solid #2d3748;
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    header h1 { font-size: 1.4rem; font-weight: 700; color: #f7c948; letter-spacing: 0.03em; }
+    header span { font-size: 0.85rem; color: #94a3b8; }
+
+    main { padding: 2rem; max-width: 1400px; margin: 0 auto; }
+
+    /* ---- Global-Aktionen ---- */
+    .global-actions {
+      background: #1a1d2e;
+      border: 1px solid #2d3748;
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .global-actions h2 { font-size: 1rem; color: #94a3b8; margin-right: 0.5rem; }
+
+    /* ---- Buttons ---- */
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      padding: 0.5rem 1rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    button:hover { opacity: 0.85; transform: translateY(-1px); }
+    button:active { transform: translateY(0); }
+    .btn-primary   { background: #3b82f6; color: #fff; }
+    .btn-success   { background: #22c55e; color: #fff; }
+    .btn-warning   { background: #f59e0b; color: #000; }
+    .btn-danger    { background: #ef4444; color: #fff; }
+    .btn-secondary { background: #334155; color: #e2e8f0; }
+    .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.8rem; }
+
+    /* ---- Inputs ---- */
+    input[type="number"], input[type="text"], select {
+      background: #0f1117;
+      border: 1px solid #2d3748;
+      border-radius: 6px;
+      color: #e2e8f0;
+      padding: 0.4rem 0.75rem;
+      font-size: 0.875rem;
+      width: 100%;
+    }
+    input[type="number"] { width: 80px; }
+    label { font-size: 0.8rem; color: #94a3b8; display: block; margin-bottom: 0.25rem; }
+
+    /* ---- Client-Grid ---- */
+    #client-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 1.25rem;
+    }
+
+    /* ---- Client-Card ---- */
+    .card {
+      background: #1a1d2e;
+      border: 1px solid #2d3748;
+      border-radius: 12px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.9rem;
+    }
+    .card.offline { opacity: 0.5; border-color: #ef4444; }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-title { font-size: 1.1rem; font-weight: 700; color: #f7c948; }
+
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.2rem 0.6rem;
+      border-radius: 99px;
+      text-transform: uppercase;
+    }
+    .badge-online  { background: #166534; color: #86efac; }
+    .badge-offline { background: #7f1d1d; color: #fca5a5; }
+    .badge-paused  { background: #713f12; color: #fde68a; }
+
+    .card-meta {
+      font-size: 0.78rem;
+      color: #64748b;
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+    .card-meta span { color: #94a3b8; }
+
+    .card-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    /* ---- Trennlinie ---- */
+    .divider {
+      border: none;
+      border-top: 1px solid #2d3748;
+      margin: 0.25rem 0;
+    }
+
+    /* ---- Inline-Form ---- */
+    .inline-form {
+      display: flex;
+      align-items: flex-end;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .form-group { display: flex; flex-direction: column; gap: 0.2rem; }
+    .form-group input[type="number"] { width: 90px; }
+    .form-group input[type="text"]   { width: 200px; }
+
+    /* ---- Upload ---- */
+    .upload-area {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .upload-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    input[type="file"] {
+      font-size: 0.78rem;
+      color: #94a3b8;
+      flex: 1;
+    }
+
+    /* ---- Toast / Notification ---- */
+    #toast-container {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      z-index: 999;
+    }
+    .toast {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-size: 0.85rem;
+      max-width: 320px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      animation: slide-in 0.25s ease;
+    }
+    .toast.success { border-color: #22c55e; }
+    .toast.error   { border-color: #ef4444; }
+    @keyframes slide-in { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+    /* ---- Leerer Zustand ---- */
+    #empty-state {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: #475569;
+    }
+    #empty-state h2 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+
+    /* ---- Responsive ---- */
+    @media (max-width: 600px) {
+      main { padding: 1rem; }
+      header { padding: 0.75rem 1rem; }
+      .global-actions { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🏭 Hallenvisualisierung – Admin-Dashboard</h1>
+  <span id="last-update">Letztes Update: –</span>
+</header>
+
+<main>
+  <!-- Globale Aktionen -->
+  <section class="global-actions">
+    <h2>Global:</h2>
+    <button class="btn-warning" onclick="globalCommand('pause')">⏸ Alle pausieren</button>
+    <button class="btn-success" onclick="globalCommand('resume')">▶ Alle fortsetzen</button>
+    <div class="inline-form">
+      <div class="form-group">
+        <label>Intervall (alle)</label>
+        <input type="number" id="global-interval" value="30" min="5" max="3600" />
+      </div>
+      <button class="btn-primary btn-sm" onclick="globalSetInterval()">✓ Übernehmen</button>
+    </div>
+  </section>
+
+  <!-- Client-Grid -->
+  <div id="client-grid"></div>
+  <div id="empty-state" style="display:none;">
+    <h2>Keine Clients registriert</h2>
+    <p>Display-Pis müssen gestartet und erreichbar sein.</p>
+  </div>
+</main>
+
+<!-- Toast-Container -->
+<div id="toast-container"></div>
+
+<script>
+  // -----------------------------------------------------------------------
+  // API-Helfer
+  // -----------------------------------------------------------------------
+  async function api(method, path, body = null) {
+    const opts = {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+    };
+    if (body) opts.body = JSON.stringify(body);
+    try {
+      const res = await fetch(path, opts);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      return await res.json();
+    } catch (e) {
+      throw e;
+    }
+  }
+
+  async function apiForm(path, formData) {
+    try {
+      const res = await fetch(path, { method: 'POST', body: formData });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+      return await res.json();
+    } catch (e) {
+      throw e;
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Toast-Benachrichtigungen
+  // -----------------------------------------------------------------------
+  function toast(msg, type = 'success') {
+    const c = document.getElementById('toast-container');
+    const el = document.createElement('div');
+    el.className = `toast ${type}`;
+    el.textContent = msg;
+    c.appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+  }
+
+  // -----------------------------------------------------------------------
+  // Client-Karte rendern
+  // -----------------------------------------------------------------------
+  function renderCard(c) {
+    const isOnline = c.status === 'online';
+    const isPaused = c.paused;
+
+    let badgeClass = isOnline ? (isPaused ? 'badge-paused' : 'badge-online') : 'badge-offline';
+    let badgeText  = isOnline ? (isPaused ? 'PAUSE' : 'Online') : 'Offline';
+
+    const sn = c.spur_name;
+    const imgLabel = c.current_image || '–';
+
+    return `
+    <div class="card ${isOnline ? '' : 'offline'}" id="card-${esc(sn)}">
+      <div class="card-header">
+        <span class="card-title">${esc(sn)}</span>
+        <span class="badge ${badgeClass}">${badgeText}</span>
+      </div>
+
+      <div class="card-meta">
+        <div>IP: <span>${esc(c.ip || '–')}</span></div>
+        <div>Aktuelles Bild: <span>${esc(imgLabel)}</span></div>
+        <div>Intervall: <span>${c.interval_seconds}s</span></div>
+        <div>Ordner: <span>${esc(c.image_folder || '–')}</span></div>
+      </div>
+
+      <hr class="divider" />
+
+      <!-- Steuerung -->
+      <div class="card-controls">
+        <button class="btn-secondary btn-sm" onclick="sendCmd('${esc(sn)}','next_image')">⏭ Nächstes Bild</button>
+        <button class="btn-secondary btn-sm" onclick="sendCmd('${esc(sn)}','set_image',{image_index:0})">🖼 Bild 1</button>
+        <button class="btn-secondary btn-sm" onclick="sendCmd('${esc(sn)}','set_image',{image_index:1})">🖼 Bild 2</button>
+        ${isPaused
+          ? `<button class="btn-success btn-sm" onclick="sendCmd('${esc(sn)}','resume')">▶ Fortsetzen</button>`
+          : `<button class="btn-warning btn-sm" onclick="sendCmd('${esc(sn)}','pause')">⏸ Pause</button>`
+        }
+      </div>
+
+      <!-- Intervall ändern -->
+      <div class="inline-form">
+        <div class="form-group">
+          <label>Intervall (s)</label>
+          <input type="number" id="interval-${esc(sn)}" value="${c.interval_seconds}" min="5" max="3600" />
+        </div>
+        <button class="btn-primary btn-sm" onclick="setInterval_('${esc(sn)}')">✓ Setzen</button>
+      </div>
+
+      <!-- Ordner ändern -->
+      <div class="inline-form">
+        <div class="form-group">
+          <label>Bildordner-Pfad</label>
+          <input type="text" id="folder-${esc(sn)}" value="${esc(c.image_folder || '')}" placeholder="/home/pi/spur-bilder" />
+        </div>
+        <button class="btn-primary btn-sm" onclick="setFolder('${esc(sn)}')">✓ Setzen</button>
+      </div>
+
+      <hr class="divider" />
+
+      <!-- Bilder-Upload -->
+      <div class="upload-area">
+        <label style="font-size:0.85rem;color:#94a3b8;">Bilder hochladen & an Pi übertragen:</label>
+        <div class="upload-row">
+          <input type="file" id="file-spur-${esc(sn)}" accept="image/png,image/jpeg" />
+          <button class="btn-secondary btn-sm" onclick="uploadImage('${esc(sn)}','spur_bezeichnung')">📤 Spurbezeichnung</button>
+        </div>
+        <div class="upload-row">
+          <input type="file" id="file-kenn-${esc(sn)}" accept="image/png,image/jpeg" />
+          <button class="btn-secondary btn-sm" onclick="uploadImage('${esc(sn)}','kennzahlen')">📤 Kennzahlen</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function esc(s) {
+    return String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  }
+
+  // -----------------------------------------------------------------------
+  // Dashboard-Refresh
+  // -----------------------------------------------------------------------
+  async function refreshDashboard() {
+    try {
+      const clients = await api('GET', '/api/clients');
+      const grid = document.getElementById('client-grid');
+      const empty = document.getElementById('empty-state');
+
+      if (clients.length === 0) {
+        grid.innerHTML = '';
+        empty.style.display = '';
+      } else {
+        empty.style.display = 'none';
+        // Karten sortiert nach Spur-Name
+        clients.sort((a, b) => a.spur_name.localeCompare(b.spur_name));
+        grid.innerHTML = clients.map(renderCard).join('');
+      }
+
+      document.getElementById('last-update').textContent =
+        'Letztes Update: ' + new Date().toLocaleTimeString('de-DE');
+    } catch (e) {
+      console.error('Refresh fehlgeschlagen:', e);
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Befehlsfunktionen
+  // -----------------------------------------------------------------------
+  async function sendCmd(spurName, command, extra = {}) {
+    try {
+      await api('POST', `/api/clients/${encodeURIComponent(spurName)}/command`, { command, ...extra });
+      toast(`✓ ${spurName}: ${command}`);
+      await refreshDashboard();
+    } catch (e) {
+      toast(`✗ ${spurName}: ${e.message}`, 'error');
+    }
+  }
+
+  async function setInterval_(spurName) {
+    const val = parseInt(document.getElementById(`interval-${spurName}`)?.value, 10);
+    if (!val || val < 5) { toast('Ungültiges Intervall (min. 5s)', 'error'); return; }
+    await sendCmd(spurName, 'set_interval', { interval_seconds: val });
+  }
+
+  async function setFolder(spurName) {
+    const val = document.getElementById(`folder-${spurName}`)?.value?.trim();
+    if (!val) { toast('Bitte Ordnerpfad eingeben', 'error'); return; }
+    await sendCmd(spurName, 'set_folder', { image_folder: val });
+  }
+
+  async function globalCommand(command) {
+    try {
+      await api('POST', '/api/global/command', { command });
+      toast(`Global: ${command}`);
+      await refreshDashboard();
+    } catch (e) {
+      toast(`Fehler: ${e.message}`, 'error');
+    }
+  }
+
+  async function globalSetInterval() {
+    const val = parseInt(document.getElementById('global-interval')?.value, 10);
+    if (!val || val < 5) { toast('Ungültiges Intervall (min. 5s)', 'error'); return; }
+    try {
+      await api('POST', '/api/global/command', { command: 'set_interval', interval_seconds: val });
+      toast(`Intervall global auf ${val}s gesetzt`);
+      await refreshDashboard();
+    } catch (e) {
+      toast(`Fehler: ${e.message}`, 'error');
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Bilder-Upload
+  // -----------------------------------------------------------------------
+  async function uploadImage(spurName, imageType) {
+    const inputId = imageType === 'spur_bezeichnung'
+      ? `file-spur-${spurName}`
+      : `file-kenn-${spurName}`;
+    const input = document.getElementById(inputId);
+    if (!input || !input.files.length) {
+      toast('Bitte zuerst eine Datei auswählen', 'error');
+      return;
+    }
+    const file = input.files[0];
+    const formData = new FormData();
+    formData.append('image_type', imageType);
+    formData.append('file', file);
+
+    try {
+      toast(`Hochladen: ${file.name} → ${spurName}…`);
+      const res = await apiForm(`/api/clients/${encodeURIComponent(spurName)}/upload`, formData);
+      if (res.delivered) {
+        toast(`✓ Bild erfolgreich übertragen: ${res.filename}`);
+      } else {
+        toast(`⚠ Bild gespeichert, aber Pi nicht erreichbar (wird beim nächsten Poll übertragen)`, 'error');
+      }
+      input.value = '';
+      await refreshDashboard();
+    } catch (e) {
+      toast(`✗ Upload fehlgeschlagen: ${e.message}`, 'error');
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Init
+  // -----------------------------------------------------------------------
+  refreshDashboard();
+  setInterval(refreshDashboard, 5000);   // alle 5s aktualisieren
+</script>
+
+</body>
+</html>

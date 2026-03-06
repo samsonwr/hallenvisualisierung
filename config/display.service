@@ -1,0 +1,24 @@
+[Unit]
+Description=Hallenvisualisierung Display-Client
+After=network.target graphical-session.target
+Wants=graphical-session.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/hallenvisualisierung/client
+ExecStart=/home/pi/hallenvisualisierung/venv/bin/python display.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Umgebungsvariablen für Pygame / HDMI-Display
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/pi/.Xauthority
+Environment=SDL_VIDEODRIVER=x11
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=graphical-session.target
