@@ -70,15 +70,15 @@ info "Aktualisiere Paketlisten..."
 apt-get update -qq
 
 info "Installiere System-Pakete..."
-PACKAGES="python3 python3-venv python3-pip git ntp"
+PACKAGES="python3 python3-venv python3-pip git"
 if [[ "$MODE" == "client" ]]; then
   PACKAGES="$PACKAGES python3-pygame libsdl2-dev libsdl2-image-dev"
 fi
 apt-get install -y $PACKAGES
 
-# NTP-Dienst aktivieren (wichtig für synchronen Bildwechsel)
-systemctl enable --now ntp || systemctl enable --now systemd-timesyncd || true
-info "NTP-Synchronisation aktiviert"
+# Zeitsynchronisation aktivieren (wichtig für synchronen Bildwechsel)
+timedatectl set-ntp true
+info "Zeitsynchronisation aktiviert (systemd-timesyncd)"
 
 # =============================================================================
 # 2. Projektdateien kopieren

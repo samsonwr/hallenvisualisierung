@@ -236,14 +236,11 @@ Wenn eine Tastatur angeschlossen ist:
 Status prüfen:
 ```bash
 timedatectl status
-# oder
-ntpq -p
 ```
 
 Falls NTP nicht aktiv:
 ```bash
-sudo apt install ntp
-sudo systemctl enable --now ntp
+sudo timedatectl set-ntp true
 ```
 
 Der Algorithmus: `int(time.time()) // interval_seconds % 2` bestimmt,
