@@ -2,7 +2,7 @@
 """
 Kleiner HTTP-Server, der auf jedem Display-Pi läuft und direkte Steuerbefehle
 vom Admin-Server sowie Bilder-Uploads entgegennimmt.
-Kommuniziert mit display.py über eine gemeinsame Queue-Datei.
+Kommuniziert mit display.py über eine gemeinsame Command-Datei (/tmp/display_command.json).
 """
 
 import json
@@ -51,7 +51,7 @@ async def receive_command(cmd: Command):
     data = cmd.model_dump(exclude_none=True)
     write_command(data)
 
-    # Bei Konfigurationsändernden Befehlen config.json sofort aktualisieren
+    # Bei konfigurationsändernden Befehlen config.json sofort aktualisieren
     cfg = load_config()
     if cmd.command == "set_interval" and cmd.interval_seconds:
         cfg["interval_seconds"] = cmd.interval_seconds
@@ -71,7 +71,16 @@ async def receive_image(file: UploadFile = File(...)):
     folder = cfg.get("image_folder", "/home/pi/spur-bilder")
     Path(folder).mkdir(parents=True, exist_ok=True)
 
-    dest = Path(folder) / file.filename
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Dateiname fehlt")
+
+    # Nur erlaubte Dateinamen akzeptieren
+    allowed = {"spur_bezeichnung.png", "kennzahlen.png"}
+    filename = file.filename
+    if filename not in allowed:
+        log.warning(f"Unerwarteter Dateiname: {filename} – wird trotzdem gespeichert")
+
+    dest = Path(folder) / filename
     data = await file.read()
     dest.write_bytes(data)
     log.info(f"Bild gespeichert: {dest} ({len(data)} Bytes)")

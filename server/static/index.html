@@ -26,7 +26,14 @@
       gap: 1rem;
     }
     header h1 { font-size: 1.4rem; font-weight: 700; color: #f7c948; letter-spacing: 0.03em; }
-    header span { font-size: 0.85rem; color: #94a3b8; }
+    .header-info {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      font-size: 0.85rem;
+      color: #94a3b8;
+    }
+    .client-count { font-weight: 600; color: #22c55e; }
 
     main { padding: 2rem; max-width: 1400px; margin: 0 auto; }
 
@@ -74,12 +81,13 @@
       width: 100%;
     }
     input[type="number"] { width: 80px; }
+    input:focus { outline: none; border-color: #3b82f6; }
     label { font-size: 0.8rem; color: #94a3b8; display: block; margin-bottom: 0.25rem; }
 
     /* ---- Client-Grid ---- */
     #client-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
       gap: 1.25rem;
     }
 
@@ -92,8 +100,10 @@
       display: flex;
       flex-direction: column;
       gap: 0.9rem;
+      transition: border-color 0.2s;
     }
     .card.offline { opacity: 0.5; border-color: #ef4444; }
+    .card.paused  { border-color: #f59e0b; }
 
     .card-header {
       display: flex;
@@ -116,11 +126,12 @@
     .card-meta {
       font-size: 0.78rem;
       color: #64748b;
-      display: flex;
-      flex-direction: column;
-      gap: 0.15rem;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 0.15rem 0.75rem;
     }
-    .card-meta span { color: #94a3b8; }
+    .card-meta dt { color: #64748b; }
+    .card-meta dd { color: #94a3b8; }
 
     .card-controls {
       display: flex;
@@ -144,7 +155,7 @@
     }
     .form-group { display: flex; flex-direction: column; gap: 0.2rem; }
     .form-group input[type="number"] { width: 90px; }
-    .form-group input[type="text"]   { width: 200px; }
+    .form-group input[type="text"]   { min-width: 200px; flex: 1; }
 
     /* ---- Upload ---- */
     .upload-area {
@@ -180,7 +191,7 @@
       border-radius: 8px;
       padding: 0.75rem 1rem;
       font-size: 0.85rem;
-      max-width: 320px;
+      max-width: 360px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.5);
       animation: slide-in 0.25s ease;
     }
@@ -195,34 +206,39 @@
       color: #475569;
     }
     #empty-state h2 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    #empty-state p { color: #64748b; }
 
     /* ---- Responsive ---- */
     @media (max-width: 600px) {
       main { padding: 1rem; }
-      header { padding: 0.75rem 1rem; }
+      header { padding: 0.75rem 1rem; flex-direction: column; }
       .global-actions { flex-direction: column; align-items: flex-start; }
+      #client-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
 
 <header>
-  <h1>🏭 Hallenvisualisierung – Admin-Dashboard</h1>
-  <span id="last-update">Letztes Update: –</span>
+  <h1>Hallenvisualisierung – Admin-Dashboard</h1>
+  <div class="header-info">
+    <span>Clients: <span class="client-count" id="client-count">0</span></span>
+    <span id="last-update">Letztes Update: –</span>
+  </div>
 </header>
 
 <main>
   <!-- Globale Aktionen -->
   <section class="global-actions">
     <h2>Global:</h2>
-    <button class="btn-warning" onclick="globalCommand('pause')">⏸ Alle pausieren</button>
-    <button class="btn-success" onclick="globalCommand('resume')">▶ Alle fortsetzen</button>
+    <button class="btn-warning" onclick="globalCommand('pause')">Alle pausieren</button>
+    <button class="btn-success" onclick="globalCommand('resume')">Alle fortsetzen</button>
     <div class="inline-form">
       <div class="form-group">
         <label>Intervall (alle)</label>
         <input type="number" id="global-interval" value="30" min="5" max="3600" />
       </div>
-      <button class="btn-primary btn-sm" onclick="globalSetInterval()">✓ Übernehmen</button>
+      <button class="btn-primary btn-sm" onclick="globalSetInterval()">Setzen</button>
     </div>
   </section>
 
@@ -230,7 +246,8 @@
   <div id="client-grid"></div>
   <div id="empty-state" style="display:none;">
     <h2>Keine Clients registriert</h2>
-    <p>Display-Pis müssen gestartet und erreichbar sein.</p>
+    <p>Display-Pis starten und mit dem Netzwerk verbinden.<br>
+       Clients registrieren sich automatisch beim Server.</p>
   </div>
 </main>
 
@@ -247,29 +264,21 @@
       headers: { 'Content-Type': 'application/json' },
     };
     if (body) opts.body = JSON.stringify(body);
-    try {
-      const res = await fetch(path, opts);
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || `HTTP ${res.status}`);
-      }
-      return await res.json();
-    } catch (e) {
-      throw e;
+    const res = await fetch(path, opts);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
     }
+    return await res.json();
   }
 
   async function apiForm(path, formData) {
-    try {
-      const res = await fetch(path, { method: 'POST', body: formData });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || `HTTP ${res.status}`);
-      }
-      return await res.json();
-    } catch (e) {
-      throw e;
+    const res = await fetch(path, { method: 'POST', body: formData });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${res.status}`);
     }
+    return await res.json();
   }
 
   // -----------------------------------------------------------------------
@@ -288,72 +297,83 @@
   // Client-Karte rendern
   // -----------------------------------------------------------------------
   function renderCard(c) {
-    const isOnline = c.status === 'online';
-    const isPaused = c.paused;
+    const status = c.status;
+    const isPaused = status === 'paused';
 
-    let badgeClass = isOnline ? (isPaused ? 'badge-paused' : 'badge-online') : 'badge-offline';
-    let badgeText  = isOnline ? (isPaused ? 'PAUSE' : 'Online') : 'Offline';
+    let badgeClass, badgeText;
+    if (status === 'offline') {
+      badgeClass = 'badge-offline';
+      badgeText = 'Offline';
+    } else if (isPaused) {
+      badgeClass = 'badge-paused';
+      badgeText = 'Pause';
+    } else {
+      badgeClass = 'badge-online';
+      badgeText = 'Online';
+    }
 
     const sn = c.spur_name;
     const imgLabel = c.current_image || '–';
+    const cardClass = status === 'offline' ? 'offline' : (isPaused ? 'paused' : '');
 
     return `
-    <div class="card ${isOnline ? '' : 'offline'}" id="card-${esc(sn)}">
+    <div class="card ${cardClass}" id="card-${esc(sn)}">
       <div class="card-header">
         <span class="card-title">${esc(sn)}</span>
         <span class="badge ${badgeClass}">${badgeText}</span>
       </div>
 
-      <div class="card-meta">
-        <div>IP: <span>${esc(c.ip || '–')}</span></div>
-        <div>Aktuelles Bild: <span>${esc(imgLabel)}</span></div>
-        <div>Intervall: <span>${c.interval_seconds}s</span></div>
-        <div>Ordner: <span>${esc(c.image_folder || '–')}</span></div>
-      </div>
+      <dl class="card-meta">
+        <dt>IP:</dt>         <dd>${esc(c.ip || '–')}</dd>
+        <dt>Bild:</dt>       <dd>${esc(imgLabel)}</dd>
+        <dt>Intervall:</dt>  <dd>${c.interval_seconds}s</dd>
+        <dt>Ordner:</dt>     <dd>${esc(c.image_folder || '–')}</dd>
+      </dl>
 
       <hr class="divider" />
 
       <!-- Steuerung -->
       <div class="card-controls">
-        <button class="btn-secondary btn-sm" onclick="sendCmd('${esc(sn)}','next_image')">⏭ Nächstes Bild</button>
-        <button class="btn-secondary btn-sm" onclick="sendCmd('${esc(sn)}','set_image',{image_index:0})">🖼 Bild 1</button>
-        <button class="btn-secondary btn-sm" onclick="sendCmd('${esc(sn)}','set_image',{image_index:1})">🖼 Bild 2</button>
+        <button class="btn-secondary btn-sm" onclick="sendCmd('${esc(sn)}','next_image')">Naechstes Bild</button>
+        <button class="btn-secondary btn-sm" onclick="sendCmd('${esc(sn)}','set_image',{image_index:0})">Bild 1</button>
+        <button class="btn-secondary btn-sm" onclick="sendCmd('${esc(sn)}','set_image',{image_index:1})">Bild 2</button>
         ${isPaused
-          ? `<button class="btn-success btn-sm" onclick="sendCmd('${esc(sn)}','resume')">▶ Fortsetzen</button>`
-          : `<button class="btn-warning btn-sm" onclick="sendCmd('${esc(sn)}','pause')">⏸ Pause</button>`
+          ? `<button class="btn-success btn-sm" onclick="sendCmd('${esc(sn)}','resume')">Fortsetzen</button>`
+          : `<button class="btn-warning btn-sm" onclick="sendCmd('${esc(sn)}','pause')">Pause</button>`
         }
+        <button class="btn-secondary btn-sm" onclick="sendCmd('${esc(sn)}','reload_images')">Bilder neu laden</button>
       </div>
 
-      <!-- Intervall ändern -->
+      <!-- Intervall aendern -->
       <div class="inline-form">
         <div class="form-group">
           <label>Intervall (s)</label>
           <input type="number" id="interval-${esc(sn)}" value="${c.interval_seconds}" min="5" max="3600" />
         </div>
-        <button class="btn-primary btn-sm" onclick="setInterval_('${esc(sn)}')">✓ Setzen</button>
+        <button class="btn-primary btn-sm" onclick="setInterval_('${esc(sn)}')">Setzen</button>
       </div>
 
-      <!-- Ordner ändern -->
+      <!-- Ordner aendern -->
       <div class="inline-form">
         <div class="form-group">
           <label>Bildordner-Pfad</label>
           <input type="text" id="folder-${esc(sn)}" value="${esc(c.image_folder || '')}" placeholder="/home/pi/spur-bilder" />
         </div>
-        <button class="btn-primary btn-sm" onclick="setFolder('${esc(sn)}')">✓ Setzen</button>
+        <button class="btn-primary btn-sm" onclick="setFolder('${esc(sn)}')">Setzen</button>
       </div>
 
       <hr class="divider" />
 
       <!-- Bilder-Upload -->
       <div class="upload-area">
-        <label style="font-size:0.85rem;color:#94a3b8;">Bilder hochladen & an Pi übertragen:</label>
+        <label style="font-size:0.85rem;color:#94a3b8;">Bilder hochladen:</label>
         <div class="upload-row">
           <input type="file" id="file-spur-${esc(sn)}" accept="image/png,image/jpeg" />
-          <button class="btn-secondary btn-sm" onclick="uploadImage('${esc(sn)}','spur_bezeichnung')">📤 Spurbezeichnung</button>
+          <button class="btn-secondary btn-sm" onclick="uploadImage('${esc(sn)}','spur_bezeichnung')">Spurbezeichnung</button>
         </div>
         <div class="upload-row">
           <input type="file" id="file-kenn-${esc(sn)}" accept="image/png,image/jpeg" />
-          <button class="btn-secondary btn-sm" onclick="uploadImage('${esc(sn)}','kennzahlen')">📤 Kennzahlen</button>
+          <button class="btn-secondary btn-sm" onclick="uploadImage('${esc(sn)}','kennzahlen')">Kennzahlen</button>
         </div>
       </div>
     </div>`;
@@ -373,13 +393,16 @@
       const clients = await api('GET', '/api/clients');
       const grid = document.getElementById('client-grid');
       const empty = document.getElementById('empty-state');
+      const countEl = document.getElementById('client-count');
+
+      const onlineCount = clients.filter(c => c.status !== 'offline').length;
+      countEl.textContent = `${onlineCount}/${clients.length}`;
 
       if (clients.length === 0) {
         grid.innerHTML = '';
         empty.style.display = '';
       } else {
         empty.style.display = 'none';
-        // Karten sortiert nach Spur-Name
         clients.sort((a, b) => a.spur_name.localeCompare(b.spur_name));
         grid.innerHTML = clients.map(renderCard).join('');
       }
@@ -397,16 +420,16 @@
   async function sendCmd(spurName, command, extra = {}) {
     try {
       await api('POST', `/api/clients/${encodeURIComponent(spurName)}/command`, { command, ...extra });
-      toast(`✓ ${spurName}: ${command}`);
+      toast(`${spurName}: ${command}`);
       await refreshDashboard();
     } catch (e) {
-      toast(`✗ ${spurName}: ${e.message}`, 'error');
+      toast(`${spurName}: ${e.message}`, 'error');
     }
   }
 
   async function setInterval_(spurName) {
     const val = parseInt(document.getElementById(`interval-${spurName}`)?.value, 10);
-    if (!val || val < 5) { toast('Ungültiges Intervall (min. 5s)', 'error'); return; }
+    if (!val || val < 5) { toast('Ungueltiges Intervall (min. 5s)', 'error'); return; }
     await sendCmd(spurName, 'set_interval', { interval_seconds: val });
   }
 
@@ -428,7 +451,7 @@
 
   async function globalSetInterval() {
     const val = parseInt(document.getElementById('global-interval')?.value, 10);
-    if (!val || val < 5) { toast('Ungültiges Intervall (min. 5s)', 'error'); return; }
+    if (!val || val < 5) { toast('Ungueltiges Intervall (min. 5s)', 'error'); return; }
     try {
       await api('POST', '/api/global/command', { command: 'set_interval', interval_seconds: val });
       toast(`Intervall global auf ${val}s gesetzt`);
@@ -447,7 +470,7 @@
       : `file-kenn-${spurName}`;
     const input = document.getElementById(inputId);
     if (!input || !input.files.length) {
-      toast('Bitte zuerst eine Datei auswählen', 'error');
+      toast('Bitte zuerst eine Datei auswaehlen', 'error');
       return;
     }
     const file = input.files[0];
@@ -456,17 +479,17 @@
     formData.append('file', file);
 
     try {
-      toast(`Hochladen: ${file.name} → ${spurName}…`);
+      toast(`Hochladen: ${file.name} ...`);
       const res = await apiForm(`/api/clients/${encodeURIComponent(spurName)}/upload`, formData);
       if (res.delivered) {
-        toast(`✓ Bild erfolgreich übertragen: ${res.filename}`);
+        toast(`Bild erfolgreich uebertragen: ${res.filename}`);
       } else {
-        toast(`⚠ Bild gespeichert, aber Pi nicht erreichbar (wird beim nächsten Poll übertragen)`, 'error');
+        toast(`Bild gespeichert, aber Pi nicht erreichbar`, 'error');
       }
       input.value = '';
       await refreshDashboard();
     } catch (e) {
-      toast(`✗ Upload fehlgeschlagen: ${e.message}`, 'error');
+      toast(`Upload fehlgeschlagen: ${e.message}`, 'error');
     }
   }
 
@@ -474,7 +497,7 @@
   // Init
   // -----------------------------------------------------------------------
   refreshDashboard();
-  setInterval(refreshDashboard, 5000);   // alle 5s aktualisieren
+  setInterval(refreshDashboard, 5000);
 </script>
 
 </body>

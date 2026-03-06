@@ -52,6 +52,9 @@ hallenvisualisierung/
 │   ├── display.service         # systemd: Display-Client
 │   ├── display-receiver.service # systemd: Command-Receiver
 │   └── admin-server.service    # systemd: Admin-Server
+├── docs/
+│   ├── architektur.md          # Architektur-Dokumentation
+│   └── api-referenz.md         # REST-API Referenz
 ├── setup.sh                    # Automatisches Setup-Script
 └── README.md
 ```
@@ -246,6 +249,13 @@ sudo systemctl enable --now ntp
 Der Algorithmus: `int(time.time()) // interval_seconds % 2` bestimmt,
 welches Bild gezeigt wird. Da alle Pis dieselbe UTC-Zeit verwenden, wechseln
 alle gleichzeitig.
+
+---
+
+## Weitere Dokumentation
+
+- [Architektur](docs/architektur.md) – Komponentenübersicht und Kommunikationsflüsse
+- [API-Referenz](docs/api-referenz.md) – Vollständige REST-API Dokumentation
 
 ---
 
