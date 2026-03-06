@@ -42,7 +42,6 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 # ---------------------------------------------------------------------------
 # In-Memory Datenbank der registrierten Clients
 # ---------------------------------------------------------------------------
-# Format: { spur_name: ClientInfo }
 clients: dict[str, dict] = {}
 
 # Ausstehende Steuerbefehle: { spur_name: command_dict }
@@ -98,7 +97,11 @@ def is_online(client: dict) -> bool:
 
 
 def client_status(client: dict) -> str:
-    return "online" if is_online(client) else "offline"
+    if not is_online(client):
+        return "offline"
+    if client.get("paused", False):
+        return "paused"
+    return "online"
 
 
 async def push_command_to_client(client: dict, command: dict) -> bool:
@@ -144,6 +147,7 @@ async def register_client(data: ClientRegister):
         "spur_name": data.spur_name,
         "ip": data.ip,
         "status": "online",
+        "paused": False,
         "interval_seconds": data.interval_seconds,
         "image_folder": data.image_folder,
         "current_image": "",
@@ -156,21 +160,23 @@ async def register_client(data: ClientRegister):
 
 @app.post("/api/clients/heartbeat")
 async def heartbeat(data: ClientHeartbeat):
+    is_paused = data.status == "paused"
     if data.spur_name in clients:
         clients[data.spur_name].update({
             "ip": data.ip,
-            "status": "online",
+            "status": data.status,
+            "paused": is_paused,
             "interval_seconds": data.interval_seconds,
             "image_folder": data.image_folder,
             "current_image": data.current_image,
             "last_seen": time.time(),
         })
     else:
-        # Auto-Registrierung beim ersten Heartbeat
         clients[data.spur_name] = {
             "spur_name": data.spur_name,
             "ip": data.ip,
-            "status": "online",
+            "status": data.status,
+            "paused": is_paused,
             "interval_seconds": data.interval_seconds,
             "image_folder": data.image_folder,
             "current_image": data.current_image,
@@ -184,6 +190,7 @@ async def heartbeat(data: ClientHeartbeat):
 async def unregister_client(data: ClientUnregister):
     if data.spur_name in clients:
         clients[data.spur_name]["status"] = "offline"
+        clients[data.spur_name]["last_seen"] = 0
         log.info(f"Client abgemeldet: {data.spur_name}")
     return {"ok": True}
 
@@ -210,12 +217,10 @@ async def send_command(spur_name: str, payload: CommandPayload):
     client = clients[spur_name]
     command = payload.model_dump(exclude_none=True)
 
-    # Erst versuchen, direkt zu senden; sonst puffern
     sent = await push_command_to_client(client, command)
     if not sent:
         pending_commands[spur_name] = command
 
-    # Lokalen Status aktualisieren
     if payload.command == "set_interval" and payload.interval_seconds:
         client["interval_seconds"] = payload.interval_seconds
     elif payload.command == "set_folder" and payload.image_folder:
@@ -256,7 +261,7 @@ async def global_command(payload: GlobalCommand):
 @app.post("/api/clients/{spur_name}/upload")
 async def upload_image(
     spur_name: str,
-    image_type: str = Form(...),  # "spur_bezeichnung" oder "kennzahlen"
+    image_type: str = Form(...),
     file: UploadFile = File(...),
 ):
     """Lädt ein Bild hoch und überträgt es an den jeweiligen Display-Client."""
@@ -273,12 +278,12 @@ async def upload_image(
     upload_dir = BASE_DIR / "uploads" / spur_name
     upload_dir.mkdir(parents=True, exist_ok=True)
     (upload_dir / filename).write_bytes(data)
+    log.info(f"Bild gespeichert: {upload_dir / filename} ({len(data)} Bytes)")
 
     client = clients[spur_name]
     success = await push_image_to_client(client, filename, data)
 
     if success:
-        # Dem Client sagen, dass er Bilder neu laden soll
         reload_cmd = {"command": "reload_images"}
         sent = await push_command_to_client(client, reload_cmd)
         if not sent:
@@ -299,7 +304,6 @@ async def list_clients():
         result.append({
             **c,
             "status": client_status(c),
-            "paused": c.get("paused", False),
         })
     return result
 
@@ -309,7 +313,7 @@ async def get_client(spur_name: str):
     if spur_name not in clients:
         raise HTTPException(status_code=404, detail="Client nicht gefunden")
     c = clients[spur_name]
-    return {**c, "status": client_status(c), "paused": c.get("paused", False)}
+    return {**c, "status": client_status(c)}
 
 
 # ---------------------------------------------------------------------------

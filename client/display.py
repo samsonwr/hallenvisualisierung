@@ -48,17 +48,18 @@ COLOR_BLACK = (0, 0, 0)
 COLOR_WHITE = (255, 255, 255)
 COLOR_GRAY = (40, 40, 40)
 COLOR_YELLOW = (255, 200, 0)
+COLOR_RED = (200, 60, 60)
 
 # ---------------------------------------------------------------------------
 # Konfiguration
 # ---------------------------------------------------------------------------
+
 
 def load_config() -> dict:
     if CONFIG_PATH.exists():
         try:
             with open(CONFIG_PATH, "r") as f:
                 cfg = json.load(f)
-            # Fehlende Keys mit Defaults auffüllen
             for k, v in DEFAULT_CONFIG.items():
                 cfg.setdefault(k, v)
             return cfg
@@ -80,6 +81,7 @@ def save_config(cfg: dict) -> None:
 # Bild-Loader
 # ---------------------------------------------------------------------------
 
+
 def load_images(folder: str, screen_size: tuple) -> list[Optional[pygame.Surface]]:
     """Lädt die beiden PNG-Bilder aus dem Ordner und skaliert sie auf Bildschirmgröße."""
     surfaces = []
@@ -88,7 +90,7 @@ def load_images(folder: str, screen_size: tuple) -> list[Optional[pygame.Surface
         if path.exists():
             try:
                 img = pygame.image.load(str(path)).convert()
-                img = pygame.transform.scale(img, screen_size)
+                img = pygame.transform.smoothscale(img, screen_size)
                 surfaces.append(img)
                 log.info(f"Bild geladen: {path}")
             except Exception as e:
@@ -111,6 +113,7 @@ def render_placeholder(screen: pygame.Surface, text: str, font: pygame.font.Font
 # ---------------------------------------------------------------------------
 # Server-Kommunikation
 # ---------------------------------------------------------------------------
+
 
 def get_local_ip() -> str:
     import socket
@@ -143,14 +146,14 @@ def register_with_server(cfg: dict) -> None:
         log.warning(f"Registrierung fehlgeschlagen: {e}")
 
 
-def send_heartbeat(cfg: dict, current_image_index: int) -> None:
+def send_heartbeat(cfg: dict, current_image_index: int, paused: bool) -> None:
     url = cfg.get("server_url", "")
     if not url:
         return
     payload = {
         "spur_name": cfg["spur_name"],
         "ip": get_local_ip(),
-        "status": "online",
+        "status": "paused" if paused else "online",
         "current_image": IMAGE_NAMES[current_image_index],
         "interval_seconds": cfg["interval_seconds"],
         "image_folder": cfg["image_folder"],
@@ -158,7 +161,7 @@ def send_heartbeat(cfg: dict, current_image_index: int) -> None:
     try:
         requests.post(f"{url}/api/clients/heartbeat", json=payload, timeout=3)
     except Exception:
-        pass  # Heartbeat-Fehler sind unkritisch
+        pass
 
 
 def fetch_commands(cfg: dict) -> Optional[dict]:
@@ -172,7 +175,9 @@ def fetch_commands(cfg: dict) -> Optional[dict]:
             timeout=3,
         )
         if resp.status_code == 200:
-            return resp.json()
+            data = resp.json()
+            if data:
+                return data
     except Exception:
         pass
     return None
@@ -182,14 +187,18 @@ def fetch_commands(cfg: dict) -> Optional[dict]:
 # Haupt-Anwendungsklasse
 # ---------------------------------------------------------------------------
 
+
 class DisplayApp:
     def __init__(self):
         self.cfg = load_config()
-        self.paused = False
-        self.manual_index: Optional[int] = None  # für manuellen Wechsel
-        self.images_dirty = True  # Bilder neu laden
+        self._lock = threading.Lock()
+        self._paused = False
+        self._manual_index: Optional[int] = None
+        self._images_dirty = True
+        self._running = True
 
         # Pygame initialisieren
+        os.environ.setdefault("SDL_VIDEO_CENTERED", "1")
         pygame.init()
         pygame.mouse.set_visible(False)
 
@@ -210,6 +219,40 @@ class DisplayApp:
         self._server_thread.start()
 
     # ------------------------------------------------------------------
+    # Thread-sichere Properties
+    # ------------------------------------------------------------------
+
+    @property
+    def paused(self) -> bool:
+        with self._lock:
+            return self._paused
+
+    @paused.setter
+    def paused(self, value: bool):
+        with self._lock:
+            self._paused = value
+
+    @property
+    def manual_index(self) -> Optional[int]:
+        with self._lock:
+            return self._manual_index
+
+    @manual_index.setter
+    def manual_index(self, value: Optional[int]):
+        with self._lock:
+            self._manual_index = value
+
+    @property
+    def images_dirty(self) -> bool:
+        with self._lock:
+            return self._images_dirty
+
+    @images_dirty.setter
+    def images_dirty(self, value: bool):
+        with self._lock:
+            self._images_dirty = value
+
+    # ------------------------------------------------------------------
     # Server-Loop (läuft in einem separaten Thread)
     # ------------------------------------------------------------------
 
@@ -218,12 +261,12 @@ class DisplayApp:
         register_with_server(self.cfg)
         last_heartbeat = 0.0
 
-        while True:
+        while self._running:
             now = time.time()
 
             # Heartbeat alle 10 Sekunden
             if now - last_heartbeat >= 10:
-                send_heartbeat(self.cfg, self.current_index)
+                send_heartbeat(self.cfg, self.current_index, self.paused)
                 last_heartbeat = now
 
             # Steuerbefehle via HTTP-Polling abfragen
@@ -242,7 +285,7 @@ class DisplayApp:
         if cmd_file.exists():
             try:
                 data = json.loads(cmd_file.read_text())
-                cmd_file.unlink()  # Datei nach dem Lesen löschen
+                cmd_file.unlink()
                 self._apply_commands(data)
             except Exception as e:
                 log.warning(f"Fehler beim Lesen der Command-Datei: {e}")
@@ -274,15 +317,17 @@ class DisplayApp:
 
         elif cmd == "set_interval":
             new_interval = int(commands.get("interval_seconds", self.cfg["interval_seconds"]))
-            if new_interval > 0:
-                self.cfg["interval_seconds"] = new_interval
+            if new_interval >= 5:
+                with self._lock:
+                    self.cfg["interval_seconds"] = new_interval
                 save_config(self.cfg)
                 log.info(f"Intervall geändert auf {new_interval}s")
 
         elif cmd == "set_folder":
             new_folder = commands.get("image_folder", "")
             if new_folder:
-                self.cfg["image_folder"] = new_folder
+                with self._lock:
+                    self.cfg["image_folder"] = new_folder
                 self.images_dirty = True
                 save_config(self.cfg)
                 log.info(f"Bildordner geändert auf {new_folder}")
@@ -299,20 +344,22 @@ class DisplayApp:
         """Berechnet den aktuellen Bildindex basierend auf NTP-synchronisierter Zeit."""
         epoch = int(time.time())
         interval = self.cfg["interval_seconds"]
-        # Index wechselt jedes Mal, wenn ein neues Intervall beginnt
-        slot = (epoch // interval)
+        slot = epoch // interval
         return slot % len(IMAGE_NAMES)
 
     def run(self):
         log.info(f"Display-Client gestartet: {self.cfg['spur_name']}")
+        log.info(f"Bildordner: {self.cfg['image_folder']}")
+        log.info(f"Intervall: {self.cfg['interval_seconds']}s")
+        log.info(f"Server: {self.cfg['server_url']}")
 
-        while True:
+        while self._running:
             # Events verarbeiten
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self._quit()
                 elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE or event.key == pygame.K_q:
+                    if event.key in (pygame.K_ESCAPE, pygame.K_q):
                         self._quit()
                     elif event.key == pygame.K_SPACE:
                         self.paused = not self.paused
@@ -327,8 +374,9 @@ class DisplayApp:
                 self.images_dirty = False
 
             # Index bestimmen
-            if self.manual_index is not None:
-                self.current_index = self.manual_index
+            mi = self.manual_index
+            if mi is not None:
+                self.current_index = mi
                 self.manual_index = None
             elif not self.paused:
                 self.current_index = self._get_target_index()
@@ -341,19 +389,20 @@ class DisplayApp:
                 label = f"Bild fehlt: {IMAGE_NAMES[self.current_index]}"
                 render_placeholder(self.screen, label, self.font_large)
 
-            # Debug-Overlay (Spur-Name + Zeit), nur klein in der Ecke
+            # Overlay
             self._draw_overlay()
 
             pygame.display.flip()
-            self.clock.tick(10)  # 10 FPS reicht für Standbild-Anzeige
+            self.clock.tick(10)
 
     def _draw_overlay(self):
         """Zeigt Spur-Name und aktuelle Zeit klein in der oberen rechten Ecke."""
         now_str = time.strftime("%H:%M:%S")
-        status = "PAUSE" if self.paused else now_str
+        interval = self.cfg["interval_seconds"]
+        remaining = interval - (int(time.time()) % interval)
+        status = "PAUSE" if self.paused else f"{now_str}  [{remaining}s]"
         text = f"{self.cfg['spur_name']}  {status}"
         label = self.font_small.render(text, True, COLOR_WHITE)
-        # Halbtransparenter Hintergrund
         bg = pygame.Surface((label.get_width() + 16, label.get_height() + 8))
         bg.set_alpha(150)
         bg.fill(COLOR_BLACK)
@@ -364,7 +413,7 @@ class DisplayApp:
 
     def _quit(self):
         log.info("Display-Client wird beendet")
-        # Abmeldung beim Server
+        self._running = False
         url = self.cfg.get("server_url", "")
         if url:
             try:
@@ -384,5 +433,10 @@ class DisplayApp:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    app = DisplayApp()
-    app.run()
+    try:
+        app = DisplayApp()
+        app.run()
+    except Exception as e:
+        log.error(f"Kritischer Fehler: {e}", exc_info=True)
+        pygame.quit()
+        sys.exit(1)
