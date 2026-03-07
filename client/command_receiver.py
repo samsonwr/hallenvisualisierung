@@ -8,6 +8,7 @@ Kommuniziert mit display.py über eine gemeinsame Command-Datei (/tmp/display_co
 import json
 import logging
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -46,9 +47,43 @@ def save_config(cfg: dict):
     CONFIG_PATH.write_text(json.dumps(cfg, indent=2))
 
 
+def cec_send(cec_cmd: str) -> bool:
+    """Sendet einen CEC-Befehl über cec-client an den TV."""
+    try:
+        result = subprocess.run(
+            ["cec-client", "-s", "-d", "1"],
+            input=cec_cmd + "\n",
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        log.info(f"CEC-Befehl '{cec_cmd}' gesendet (returncode={result.returncode})")
+        return result.returncode == 0
+    except FileNotFoundError:
+        log.error("cec-client nicht gefunden – bitte 'sudo apt install cec-utils' ausführen")
+        return False
+    except subprocess.TimeoutExpired:
+        log.warning(f"CEC-Befehl '{cec_cmd}' Timeout")
+        return False
+    except Exception as e:
+        log.error(f"CEC-Fehler: {e}")
+        return False
+
+
 @app.post("/command")
 async def receive_command(cmd: Command):
     data = cmd.model_dump(exclude_none=True)
+
+    # CEC-Befehle direkt ausführen (nicht an display.py weiterleiten)
+    if cmd.command == "tv_on":
+        success = cec_send("on 0")
+        log.info(f"TV einschalten: {'OK' if success else 'FEHLER'}")
+        return {"ok": success}
+    elif cmd.command == "tv_off":
+        success = cec_send("standby 0")
+        log.info(f"TV ausschalten: {'OK' if success else 'FEHLER'}")
+        return {"ok": success}
+
     write_command(data)
 
     # Bei konfigurationsändernden Befehlen config.json sofort aktualisieren

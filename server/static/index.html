@@ -233,6 +233,8 @@
     <h2>Global:</h2>
     <button class="btn-warning" onclick="globalCommand('pause')">Alle pausieren</button>
     <button class="btn-success" onclick="globalCommand('resume')">Alle fortsetzen</button>
+    <button class="btn-success btn-sm" onclick="globalCommand('tv_on')">Alle TVs ein</button>
+    <button class="btn-danger btn-sm" onclick="globalCommand('tv_off')">Alle TVs aus</button>
     <div class="inline-form">
       <div class="form-group">
         <label>Intervall (alle)</label>
@@ -342,6 +344,8 @@
           : `<button class="btn-warning btn-sm" onclick="sendCmd('${esc(sn)}','pause')">Pause</button>`
         }
         <button class="btn-secondary btn-sm" onclick="sendCmd('${esc(sn)}','reload_images')">Bilder neu laden</button>
+        <button class="btn-success btn-sm" onclick="sendCmd('${esc(sn)}','tv_on')">TV ein</button>
+        <button class="btn-danger btn-sm" onclick="sendCmd('${esc(sn)}','tv_off')">TV aus</button>
       </div>
 
       <!-- Intervall aendern -->

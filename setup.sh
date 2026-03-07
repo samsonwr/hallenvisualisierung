@@ -72,7 +72,7 @@ apt-get update -qq
 info "Installiere System-Pakete..."
 PACKAGES="python3 python3-venv python3-pip git"
 if [[ "$MODE" == "client" ]]; then
-  PACKAGES="$PACKAGES python3-pygame libsdl2-dev libsdl2-image-dev"
+  PACKAGES="$PACKAGES python3-pygame libsdl2-dev libsdl2-image-dev cec-utils"
 fi
 apt-get install -y $PACKAGES
 
