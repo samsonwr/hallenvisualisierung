@@ -261,10 +261,17 @@ class DisplayApp:
         new_cfg = load_config()
         with self._lock:
             old_folder = self.cfg.get("image_folder")
+            old_url = self.cfg.get("server_url")
+            old_spur = self.cfg.get("spur_name")
             self.cfg = new_cfg
             if new_cfg.get("image_folder") != old_folder:
                 self._images_dirty = True
-                log.info(f"Config neu geladen – Bildordner geändert: {new_cfg.get('image_folder')}")
+                log.info(f"Config: Bildordner geändert: {old_folder} -> {new_cfg.get('image_folder')}")
+            server_changed = new_cfg.get("server_url") != old_url
+            spur_changed = new_cfg.get("spur_name") != old_spur
+        if server_changed or spur_changed:
+            log.info(f"Config: Server-URL geändert: {old_url} -> {new_cfg.get('server_url')}")
+            register_with_server(new_cfg)
 
     def _server_loop(self):
         """Registrierung, Heartbeat und Command-Polling im Hintergrund."""
@@ -280,13 +287,17 @@ class DisplayApp:
                 self._reload_config()
                 last_config_reload = now
 
+            # Aktuelle Config-Referenz holen
+            with self._lock:
+                cfg = self.cfg
+
             # Heartbeat alle 10 Sekunden
             if now - last_heartbeat >= 10:
-                send_heartbeat(self.cfg, self.current_index, self.paused)
+                send_heartbeat(cfg, self.current_index, self.paused)
                 last_heartbeat = now
 
             # Steuerbefehle via HTTP-Polling abfragen
-            commands = fetch_commands(self.cfg)
+            commands = fetch_commands(cfg)
             if commands:
                 self._apply_commands(commands)
 
