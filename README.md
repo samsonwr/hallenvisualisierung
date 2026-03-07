@@ -158,9 +158,11 @@ Alternativ: Bilder über das **Web-UI** hochladen (werden automatisch an den Pi 
   - Pause / Fortsetzen
   - Manuell zu Bild 1 oder Bild 2 wechseln
   - Bilder hochladen (werden direkt an den Pi übertragen)
+  - **TV ein-/ausschalten** via HDMI-CEC
 - **Global:**
   - Alle gleichzeitig pausieren / fortsetzen
   - Intervall für alle Pis gleichzeitig ändern
+  - **Alle TVs ein-/ausschalten** via HDMI-CEC
 
 ### REST-API Referenz
 
@@ -185,6 +187,8 @@ Alternativ: Bilder über das **Web-UI** hochladen (werden automatisch an den Pi 
 | `set_interval` | `interval_seconds: int` | Wechselintervall setzen |
 | `set_folder` | `image_folder: str` | Bildordner-Pfad ändern |
 | `reload_images` | – | Bilder aus Ordner neu laden |
+| `tv_on` | – | TV via HDMI-CEC einschalten |
+| `tv_off` | – | TV via HDMI-CEC ausschalten (Standby) |
 
 ---
 
@@ -226,6 +230,42 @@ Wenn eine Tastatur angeschlossen ist:
 | `Leertaste` | Pause / Fortsetzen |
 | `→` | Nächstes Bild |
 | `R` | Bilder neu laden |
+
+---
+
+## TV-Steuerung via HDMI-CEC
+
+Der Raspberry Pi kann den angeschlossenen TV über **HDMI-CEC** ein- und ausschalten.
+Das Paket `cec-utils` wird beim Client-Setup automatisch installiert.
+
+### Voraussetzung
+
+HDMI-CEC muss im TV aktiviert sein – je nach Hersteller heißt es anders:
+
+| Hersteller | Bezeichnung |
+|---|---|
+| Samsung | Anynet+ |
+| LG | SimpLink |
+| Sony | BRAVIA Sync |
+| Philips | EasyLink |
+
+### Manuell testen
+
+```bash
+# TV einschalten
+echo "on 0" | cec-client -s -d 1
+
+# TV ausschalten (Standby)
+echo "standby 0" | cec-client -s -d 1
+
+# Angeschlossene CEC-Geräte scannen
+echo "scan" | cec-client -s -d 1
+```
+
+### Steuerung über Admin-Panel
+
+- **Pro Client:** Buttons "TV ein" / "TV aus" in der Client-Card
+- **Global:** Buttons "Alle TVs ein" / "Alle TVs aus" im globalen Aktionsbereich
 
 ---
 
