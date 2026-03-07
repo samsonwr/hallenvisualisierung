@@ -256,36 +256,13 @@ class DisplayApp:
     # Server-Loop (läuft in einem separaten Thread)
     # ------------------------------------------------------------------
 
-    def _reload_config(self):
-        """Lädt config.json neu und übernimmt Änderungen."""
-        new_cfg = load_config()
-        with self._lock:
-            old_folder = self.cfg.get("image_folder")
-            old_url = self.cfg.get("server_url")
-            old_spur = self.cfg.get("spur_name")
-            self.cfg = new_cfg
-            if new_cfg.get("image_folder") != old_folder:
-                self._images_dirty = True
-                log.info(f"Config: Bildordner geändert: {old_folder} -> {new_cfg.get('image_folder')}")
-            server_changed = new_cfg.get("server_url") != old_url
-            spur_changed = new_cfg.get("spur_name") != old_spur
-        if server_changed or spur_changed:
-            log.info(f"Config: Server-URL geändert: {old_url} -> {new_cfg.get('server_url')}")
-            register_with_server(new_cfg)
-
     def _server_loop(self):
         """Registrierung, Heartbeat und Command-Polling im Hintergrund."""
         register_with_server(self.cfg)
         last_heartbeat = 0.0
-        last_config_reload = 0.0
 
         while self._running:
             now = time.time()
-
-            # Config alle 10 Sekunden neu laden
-            if now - last_config_reload >= 10:
-                self._reload_config()
-                last_config_reload = now
 
             # Aktuelle Config-Referenz holen
             with self._lock:
