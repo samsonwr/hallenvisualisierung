@@ -402,6 +402,13 @@
       const onlineCount = clients.filter(c => c.status !== 'offline').length;
       countEl.textContent = `${onlineCount}/${clients.length}`;
 
+      // Input-Werte und Fokus vor dem Re-Render sichern
+      const savedInputs = {};
+      const activeId = document.activeElement?.id || null;
+      grid.querySelectorAll('input').forEach(inp => {
+        if (inp.id) savedInputs[inp.id] = inp.value;
+      });
+
       if (clients.length === 0) {
         grid.innerHTML = '';
         empty.style.display = '';
@@ -409,6 +416,17 @@
         empty.style.display = 'none';
         clients.sort((a, b) => a.spur_name.localeCompare(b.spur_name));
         grid.innerHTML = clients.map(renderCard).join('');
+      }
+
+      // Gesicherte Input-Werte wiederherstellen
+      for (const [id, val] of Object.entries(savedInputs)) {
+        const inp = document.getElementById(id);
+        if (inp) inp.value = val;
+      }
+      // Fokus wiederherstellen
+      if (activeId) {
+        const el = document.getElementById(activeId);
+        if (el) el.focus();
       }
 
       document.getElementById('last-update').textContent =
@@ -501,8 +519,7 @@
   // Init
   // -----------------------------------------------------------------------
   refreshDashboard();
-  // Auto-refresh deaktiviert – überschrieb ungespeicherte Eingaben
-  // setInterval(refreshDashboard, 5000);
+  setInterval(refreshDashboard, 5000);
 </script>
 
 </body>
