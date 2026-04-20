@@ -2,5 +2,9 @@
   "spur_name": "Spur-01",
   "image_folder": "/home/pi/spur-bilder",
   "interval_seconds": 30,
-  "server_url": "http://192.168.1.100:8080"
+  "server_url": "http://192.168.1.100:8080",
+  "slots": ["spur_bezeichnung", "kennzahlen"],
+  "website_url": "",
+  "website_username": "",
+  "website_password": ""
 }

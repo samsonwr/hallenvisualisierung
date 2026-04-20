@@ -119,9 +119,10 @@
       border-radius: 99px;
       text-transform: uppercase;
     }
-    .badge-online  { background: #166534; color: #86efac; }
-    .badge-offline { background: #7f1d1d; color: #fca5a5; }
-    .badge-paused  { background: #713f12; color: #fde68a; }
+    .badge-online        { background: #166534; color: #86efac; }
+    .badge-offline       { background: #7f1d1d; color: #fca5a5; }
+    .badge-paused        { background: #713f12; color: #fde68a; }
+    .badge-login-required{ background: #4c1d95; color: #c4b5fd; }
 
     .card-meta {
       font-size: 0.78rem;
@@ -301,6 +302,7 @@
   function renderCard(c) {
     const status = c.status;
     const isPaused = status === 'paused';
+    const isLoginRequired = c.login_required || status === 'login_required';
 
     let badgeClass, badgeText;
     if (status === 'offline') {
@@ -309,6 +311,9 @@
     } else if (isPaused) {
       badgeClass = 'badge-paused';
       badgeText = 'Pause';
+    } else if (isLoginRequired) {
+      badgeClass = 'badge-login-required';
+      badgeText = 'Login erforderlich';
     } else {
       badgeClass = 'badge-online';
       badgeText = 'Online';
@@ -327,9 +332,11 @@
 
       <dl class="card-meta">
         <dt>IP:</dt>         <dd>${esc(c.ip || '–')}</dd>
-        <dt>Bild:</dt>       <dd>${esc(imgLabel)}</dd>
+        <dt>Slot:</dt>       <dd>${esc(imgLabel)}</dd>
         <dt>Intervall:</dt>  <dd>${c.interval_seconds}s</dd>
         <dt>Ordner:</dt>     <dd>${esc(c.image_folder || '–')}</dd>
+        <dt>Slots:</dt>      <dd>${esc((c.slots || []).join(', ') || '–')}</dd>
+        ${c.website_url ? `<dt>Website:</dt><dd style="word-break:break-all">${esc(c.website_url)}</dd>` : ''}
       </dl>
 
       <hr class="divider" />
@@ -364,6 +371,24 @@
           <input type="text" id="folder-${esc(sn)}" value="${esc(c.image_folder || '')}" placeholder="/home/pi/spur-bilder" />
         </div>
         <button class="btn-primary btn-sm" onclick="setFolder('${esc(sn)}')">Setzen</button>
+      </div>
+
+      <!-- Website-URL -->
+      <div class="inline-form">
+        <div class="form-group" style="flex:1">
+          <label>Website-URL</label>
+          <input type="text" id="website-url-${esc(sn)}" value="${esc(c.website_url || '')}" placeholder="https://..." style="min-width:200px;width:100%" />
+        </div>
+        <button class="btn-primary btn-sm" onclick="setWebsiteUrl('${esc(sn)}')">Setzen</button>
+      </div>
+
+      <!-- Slots -->
+      <div class="inline-form">
+        <div class="form-group" style="flex:1">
+          <label>Slots (kommagetrennt: website / spur_bezeichnung / kennzahlen)</label>
+          <input type="text" id="slots-${esc(sn)}" value="${esc((c.slots || []).join(', '))}" placeholder="website, kennzahlen" style="width:100%" />
+        </div>
+        <button class="btn-primary btn-sm" onclick="setSlots('${esc(sn)}')">Setzen</button>
       </div>
 
       <hr class="divider" />
@@ -459,6 +484,20 @@
     const val = document.getElementById(`folder-${spurName}`)?.value?.trim();
     if (!val) { toast('Bitte Ordnerpfad eingeben', 'error'); return; }
     await sendCmd(spurName, 'set_folder', { image_folder: val });
+  }
+
+  async function setWebsiteUrl(spurName) {
+    const val = document.getElementById(`website-url-${spurName}`)?.value?.trim();
+    if (!val) { toast('Bitte Website-URL eingeben', 'error'); return; }
+    await sendCmd(spurName, 'set_website_url', { website_url: val });
+  }
+
+  async function setSlots(spurName) {
+    const raw = document.getElementById(`slots-${spurName}`)?.value?.trim();
+    if (!raw) { toast('Bitte Slots eingeben', 'error'); return; }
+    const slots = raw.split(',').map(s => s.trim()).filter(Boolean);
+    if (!slots.length) { toast('Ungueltige Slots', 'error'); return; }
+    await sendCmd(spurName, 'set_slots', { slots });
   }
 
   async function globalCommand(command) {

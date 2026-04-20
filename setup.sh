@@ -72,7 +72,7 @@ apt-get update -qq
 info "Installiere System-Pakete..."
 PACKAGES="python3 python3-venv python3-pip git"
 if [[ "$MODE" == "client" ]]; then
-  PACKAGES="$PACKAGES python3-pygame libsdl2-dev libsdl2-image-dev cec-utils"
+  PACKAGES="$PACKAGES chromium-browser cec-utils"
 fi
 apt-get install -y $PACKAGES
 
@@ -118,7 +118,11 @@ if [[ "$MODE" == "client" ]]; then
   "spur_name": "${SPUR_NAME}",
   "image_folder": "${IMAGE_FOLDER}",
   "interval_seconds": ${INTERVAL},
-  "server_url": "${SERVER_URL}"
+  "server_url": "${SERVER_URL}",
+  "slots": ["spur_bezeichnung", "kennzahlen"],
+  "website_url": "",
+  "website_username": "",
+  "website_password": ""
 }
 EOF
   chown "${PI_USER}:${PI_USER}" "${CONFIG_FILE}"

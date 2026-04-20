@@ -61,6 +61,8 @@ class ClientRegister(BaseModel):
     status: str = "online"
     interval_seconds: int = 30
     image_folder: str = ""
+    website_url: str = ""
+    slots: list[str] = []
 
 
 class ClientHeartbeat(BaseModel):
@@ -70,6 +72,9 @@ class ClientHeartbeat(BaseModel):
     current_image: str = ""
     interval_seconds: int = 30
     image_folder: str = ""
+    website_url: str = ""
+    slots: list[str] = []
+    login_required: bool = False
 
 
 class ClientUnregister(BaseModel):
@@ -81,11 +86,15 @@ class CommandPayload(BaseModel):
     interval_seconds: Optional[int] = None
     image_folder: Optional[str] = None
     image_index: Optional[int] = None
+    website_url: Optional[str] = None
+    slots: Optional[list[str]] = None
 
 
 class GlobalCommand(BaseModel):
     command: str
     interval_seconds: Optional[int] = None
+    website_url: Optional[str] = None
+    slots: Optional[list[str]] = None
 
 
 # ---------------------------------------------------------------------------
@@ -150,7 +159,10 @@ async def register_client(data: ClientRegister):
         "paused": False,
         "interval_seconds": data.interval_seconds,
         "image_folder": data.image_folder,
+        "website_url": data.website_url,
+        "slots": data.slots,
         "current_image": "",
+        "login_required": False,
         "last_seen": time.time(),
         "registered_at": time.time(),
     }
@@ -168,7 +180,10 @@ async def heartbeat(data: ClientHeartbeat):
             "paused": is_paused,
             "interval_seconds": data.interval_seconds,
             "image_folder": data.image_folder,
+            "website_url": data.website_url,
+            "slots": data.slots,
             "current_image": data.current_image,
+            "login_required": data.login_required,
             "last_seen": time.time(),
         })
     else:
@@ -179,7 +194,10 @@ async def heartbeat(data: ClientHeartbeat):
             "paused": is_paused,
             "interval_seconds": data.interval_seconds,
             "image_folder": data.image_folder,
+            "website_url": data.website_url,
+            "slots": data.slots,
             "current_image": data.current_image,
+            "login_required": data.login_required,
             "last_seen": time.time(),
             "registered_at": time.time(),
         }
@@ -225,6 +243,10 @@ async def send_command(spur_name: str, payload: CommandPayload):
         client["interval_seconds"] = payload.interval_seconds
     elif payload.command == "set_folder" and payload.image_folder:
         client["image_folder"] = payload.image_folder
+    elif payload.command == "set_website_url" and payload.website_url:
+        client["website_url"] = payload.website_url
+    elif payload.command == "set_slots" and payload.slots:
+        client["slots"] = payload.slots
     elif payload.command == "pause":
         client["paused"] = True
     elif payload.command == "resume":
